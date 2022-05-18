@@ -19,18 +19,16 @@ const client = new MongoClient(uri, {
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
-  console.log(authHeader);
   if (!authHeader) {
     return res.status(401).send({ message: "UnAuthorized access" });
   }
   const token = authHeader.split(" ")[1];
-  console.log(token);
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
     if (err) {
       return res.status(403).send({ message: "Forbidden access" });
     }
-    console.log(decoded.email);
     req.decoded = decoded;
+    console.log(decoded.email);
     next();
   });
 }
@@ -52,6 +50,11 @@ async function run() {
       res.send(services);
     });
 
+    app.get("/user", async (req, res) => {
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
     app.put("/user/:email", async (req, res) => {
       const email = req.query.email;
       const user = req.body;
@@ -61,13 +64,10 @@ async function run() {
         $set: user,
       };
       const result = await userCollection.updateOne(filter, updateDoc, options);
-      const token = jwt.sign(
-        { email: email },
-        process.env.ACCESS_TOKEN_SECRET,
-        {
-          expiresIn: "1h",
-        }
-      );
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1d",
+      });
+      console.log(token);
       res.send({ result, token });
     });
 
@@ -122,13 +122,12 @@ async function run() {
     app.get("/booking", verifyJWT, async (req, res) => {
       const patient = req.query.patient;
       const decodedEmail = req.decoded.email;
-      console.log(patient, decodedEmail);
       if (patient === decodedEmail) {
         const query = { patient: patient };
         const bookings = await bookingCollection.find(query).toArray();
         return res.send(bookings);
       } else {
-        return res.status(403).send({ message: "Forbidden access" });
+        return res.status(403).send({ message: "forbidden access" });
       }
     });
 
